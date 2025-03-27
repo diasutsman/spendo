@@ -197,6 +197,9 @@ class SummaryScreen extends ConsumerStatefulWidget {
 
 class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   late Future<List<Map<String, dynamic>>> _categoryTotalsFuture;
+  DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _endDate =
+      DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
 
   @override
   void initState() {
@@ -209,6 +212,23 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     setState(() {
       _categoryTotalsFuture = _getCategoryTotals(db);
     });
+  }
+
+  void _showDateFilterDialog() async {
+    DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+        _loadCategoryTotals();
+      });
+    }
   }
 
   @override
@@ -227,29 +247,84 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         final expenseCategories =
             categoryTotals.where((c) => c['isIncome'] == false).toList();
 
-        return DefaultTabController(
-          length: 2,
-          child: Column(
-            children: [
-              TabBar(
-                tabs: [
-                  Tab(text: 'Expenses'),
-                  Tab(text: 'Income'),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildCategoryList(expenseCategories, false),
-                    _buildCategoryList(incomeCategories, true),
-                  ],
-                ),
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Summary'),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.filter_alt),
+                onPressed: _showDateFilterDialog,
               ),
             ],
+          ),
+          body: DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                TabBar(
+                  tabs: [
+                    Tab(text: 'Expenses'),
+                    Tab(text: 'Income'),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildCategoryList(expenseCategories, false),
+                      _buildCategoryList(incomeCategories, true),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () async {
+              // Determine current tab to pass isIncome
+              final isIncome = DefaultTabController.of(context).index == 1;
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => CategoryForm(
+                    initialIsIncome: isIncome,
+                  ),
+                ),
+              );
+              if (result == true) {
+                _loadCategoryTotals();
+              }
+            },
+            child: Icon(Icons.add),
           ),
         );
       },
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _getCategoryTotals(AppDatabase db) async {
+    final categoriesQuery = db.select(db.transactionCategories);
+    final categories = await categoriesQuery.get();
+
+    List<Map<String, dynamic>> categoryTotals = [];
+
+    for (var category in categories) {
+      final totalQuery = db.select(db.transactions)
+        ..where((t) => t.categoryId.equals(category.id))
+        ..where((t) => t.date.isBetweenValues(_startDate, _endDate));
+
+      final total = await totalQuery.get().then((transactions) {
+        return transactions.fold(
+            0.0, (sum, transaction) => sum + transaction.amount);
+      });
+
+      categoryTotals.add({
+        'id': category.id,
+        'name': category.name,
+        'isIncome': category.isIncome,
+        'total': total,
+      });
+    }
+
+    return categoryTotals;
   }
 
   Widget _buildCategoryList(
@@ -265,8 +340,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                       'Rp${category['total'].toStringAsFixed(2)}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color:
-                            category['total'] >= 0 ? Colors.green : Colors.red,
+                        color: isIncome ? Colors.green : Colors.red,
                       ),
                     ),
                     IconButton(
@@ -294,32 +368,6 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
           .toList(),
     );
   }
-
-  Future<List<Map<String, dynamic>>> _getCategoryTotals(AppDatabase db) async {
-    final categoriesQuery = db.select(db.transactionCategories);
-    final categories = await categoriesQuery.get();
-
-    List<Map<String, dynamic>> categoryTotals = [];
-
-    for (var category in categories) {
-      final totalQuery = db.select(db.transactions)
-        ..where((t) => t.categoryId.equals(category.id));
-
-      final total = await totalQuery.get().then((transactions) {
-        return transactions.fold(
-            0.0, (sum, transaction) => sum + transaction.amount);
-      });
-
-      categoryTotals.add({
-        'id': category.id,
-        'name': category.name,
-        'isIncome': category.isIncome,
-        'total': total,
-      });
-    }
-
-    return categoryTotals;
-  }
 }
 
 class TransactionsScreen extends ConsumerStatefulWidget {
@@ -332,6 +380,9 @@ class TransactionsScreen extends ConsumerStatefulWidget {
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   late Future<List<TypedResult>> _expenseTransactionsFuture;
   late Future<List<TypedResult>> _incomeTransactionsFuture;
+  DateTime _startDate = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _endDate =
+      DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
 
   @override
   void initState() {
@@ -354,9 +405,27 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           db.transactions.categoryId.equalsExp(db.transactionCategories.id))
     ])
       ..where(db.transactionCategories.isIncome.equals(isIncome))
+      ..where(db.transactions.date.isBetweenValues(_startDate, _endDate))
       ..orderBy([OrderingTerm.desc(db.transactions.date)]);
 
     return query.get();
+  }
+
+  void _showDateFilterDialog() async {
+    DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+        _loadTransactions();
+      });
+    }
   }
 
   @override
@@ -364,31 +433,37 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        body: DefaultTabController(
-          length: 2,
-          child: Column(
-            children: [
-              TabBar(
-                tabs: [
-                  Tab(text: 'Expenses'),
-                  Tab(text: 'Income'),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildTransactionList(_expenseTransactionsFuture, false),
-                    _buildTransactionList(_incomeTransactionsFuture, true),
-                  ],
-                ),
-              ),
+        appBar: AppBar(
+          title: Text('Transactions'),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.filter_alt),
+              onPressed: _showDateFilterDialog,
+            ),
+          ],
+          bottom: TabBar(
+            tabs: [
+              Tab(text: 'Expenses'),
+              Tab(text: 'Income'),
             ],
           ),
         ),
+        body: TabBarView(
+          children: [
+            _buildTransactionList(_expenseTransactionsFuture, false),
+            _buildTransactionList(_incomeTransactionsFuture, true),
+          ],
+        ),
         floatingActionButton: FloatingActionButton(
           onPressed: () async {
+            // Determine current tab to pass isIncome
+            final isIncome = DefaultTabController.of(context).index == 1;
             final result = await Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => TransactionForm()),
+              MaterialPageRoute(
+                builder: (context) => TransactionForm(
+                  initialIsIncome: isIncome,
+                ),
+              ),
             );
             if (result == true) {
               _loadTransactions();
@@ -424,7 +499,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Rp${transaction.amount.abs().toStringAsFixed(2)}'),
+                  Text(
+                    'Rp${transaction.amount.abs().toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: category.isIncome ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   IconButton(
                     icon: Icon(Icons.edit),
                     onPressed: () async {
@@ -432,6 +513,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         MaterialPageRoute(
                           builder: (context) => TransactionForm(
                             existingTransaction: transaction,
+                            initialIsIncome: category.isIncome,
                           ),
                         ),
                       );

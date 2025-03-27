@@ -12,8 +12,10 @@ import 'package:spendo/main.dart' show databaseProvider;
 
 class TransactionForm extends ConsumerStatefulWidget {
   final Transaction? existingTransaction;
+  final bool? initialIsIncome;
 
-  const TransactionForm({super.key, this.existingTransaction});
+  const TransactionForm(
+      {super.key, this.existingTransaction, this.initialIsIncome});
 
   @override
   ConsumerState<TransactionForm> createState() => _TransactionFormState();
@@ -25,23 +27,51 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
   DateTime? _selectedDate;
   int? _selectedCategoryId;
   List<TransactionCategory> _categories = [];
+  bool _isIncome = false;
+
+  Future<void> _laodIsIncome() async {
+    final isIncome = widget.existingTransaction != null
+        ? await _getCategoryIsIncome(widget.existingTransaction!.categoryId)
+        : (widget.initialIsIncome ?? false);
+    setState(() {
+      _isIncome = isIncome;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+
+    _laodIsIncome();
+
     _amountController = TextEditingController(
       text: widget.existingTransaction?.amount.toString() ?? '',
     );
     _descriptionController = TextEditingController(
       text: widget.existingTransaction?.description ?? '',
     );
-    _selectedDate = widget.existingTransaction?.date;
+    _selectedDate = widget.existingTransaction?.date ?? DateTime.now();
     _loadCategories();
+  }
+
+  Future<bool> _getCategoryIsIncome(int categoryId) {
+    final db = ref.read(databaseProvider);
+    final category = db.transactionCategories.select()
+      ..where((c) => c.id.equals(categoryId));
+
+    return category
+        .get()
+        .then((categories) =>
+            categories.isNotEmpty ? categories.first.isIncome : false)
+        .catchError((_) => false);
   }
 
   Future<void> _loadCategories() async {
     final db = ref.read(databaseProvider);
-    final categories = await db.select(db.transactionCategories).get();
+    final categoriesQuery = db.select(db.transactionCategories)
+      ..where((c) => c.isIncome.equals(_isIncome));
+
+    final categories = await categoriesQuery.get();
     setState(() {
       _categories = categories;
       if (widget.existingTransaction != null) {
@@ -97,8 +127,18 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
             children: [
               TextFormField(
                 controller: _amountController,
-                decoration: InputDecoration(labelText: 'Amount'),
+                decoration: InputDecoration(
+                  labelText: 'Amount',
+                  prefixText: 'Rp ',
+                  prefixStyle: TextStyle(
+                    color: _isIncome ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
+                style: TextStyle(
+                  color: _isIncome ? Colors.green : Colors.red,
+                ),
               ),
               TextFormField(
                 controller: _descriptionController,
@@ -146,6 +186,12 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
                     _selectedCategoryId = value;
                   });
                 },
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  helperText: _isIncome
+                      ? 'Showing Income Categories'
+                      : 'Showing Expense Categories',
+                ),
               ),
               ElevatedButton(
                 onPressed: _saveTransaction,
@@ -161,8 +207,9 @@ class _TransactionFormState extends ConsumerState<TransactionForm> {
 
 class CategoryForm extends ConsumerStatefulWidget {
   final TransactionCategory? existingCategory;
+  final bool? initialIsIncome;
 
-  const CategoryForm({super.key, this.existingCategory});
+  const CategoryForm({super.key, this.existingCategory, this.initialIsIncome});
 
   @override
   _CategoryFormState createState() => _CategoryFormState();
@@ -170,7 +217,7 @@ class CategoryForm extends ConsumerStatefulWidget {
 
 class _CategoryFormState extends ConsumerState<CategoryForm> {
   late TextEditingController _nameController;
-  bool _isIncome = false;
+  late bool _isIncome;
 
   @override
   void initState() {
@@ -178,11 +225,19 @@ class _CategoryFormState extends ConsumerState<CategoryForm> {
     _nameController = TextEditingController(
       text: widget.existingCategory?.name ?? '',
     );
-    _isIncome = widget.existingCategory?.isIncome ?? false;
+    _isIncome =
+        widget.existingCategory?.isIncome ?? (widget.initialIsIncome ?? false);
   }
 
   Future<void> _saveCategory() async {
     final db = ref.read(databaseProvider);
+
+    if (_nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please enter a category name')),
+      );
+      return;
+    }
 
     if (widget.existingCategory == null) {
       final category = TransactionCategoriesCompanion.insert(
@@ -236,6 +291,11 @@ class _CategoryFormState extends ConsumerState<CategoryForm> {
                     _isIncome = value ?? false;
                   });
                 },
+                decoration: InputDecoration(
+                  labelText: 'Category Type',
+                  helperText:
+                      _isIncome ? 'Income Category' : 'Expense Category',
+                ),
               ),
               ElevatedButton(
                 onPressed: _saveCategory,
