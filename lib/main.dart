@@ -133,7 +133,7 @@ Future<void> writeDummyData() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await writeDummyData();
+//   await writeDummyData();
 
   runApp(
     ProviderScope(child: SpendoApp()),
