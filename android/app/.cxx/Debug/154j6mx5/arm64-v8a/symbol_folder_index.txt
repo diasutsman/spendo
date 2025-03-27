@@ -1,0 +1,1 @@
+/home/du/programming/proj/spendo/build/app/intermediates/cxx/Debug/154j6mx5/obj/arm64-v8a

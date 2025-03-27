@@ -1,171 +1,185 @@
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:spendo/db.dart'
+    show
+        AppDatabase,
+        TransactionCategoriesCompanion,
+        TransactionCategory,
+        TransactionsCompanion;
 
-void main() {
-  runApp(PersonalBudgetApp());
+final databaseProvider = Provider((ref) => AppDatabase());
+
+Future<void> writeDummyData() async {
+  final db = ProviderContainer().read(databaseProvider);
+
+  await db.transactionCategories.deleteAll();
+  await db.transactions.deleteAll();
+
+  List<String> expenseCategories = [
+    'Food and Drinks',
+    'Gifts',
+    'Health/medical',
+    'Home',
+    'Transportation',
+    'Personal',
+    'Mistake',
+    'Utilities',
+    'MCK',
+    'Debt',
+    'Other',
+    'Corporate bull',
+    'Bank Admin',
+    'Phone Bill',
+  ];
+
+  for (int i = 0; i < expenseCategories.length; i++) {
+    await db.transactionCategories
+        .insertOne(TransactionCategoriesCompanion.insert(
+      name: expenseCategories[i],
+      isIncome: false,
+    ));
+  }
+
+  List<String> incomeCategories = [
+    'Savings',
+    'Paycheck',
+    'Bonus',
+    'Interest',
+    'Side Hustle',
+    'Freelance',
+  ];
+
+  for (int i = 0; i < incomeCategories.length; i++) {
+    await db.transactionCategories
+        .insertOne(TransactionCategoriesCompanion.insert(
+      name: incomeCategories[i],
+      isIncome: true,
+    ));
+  }
+
+  for (final line in [
+    '02/01/2025\tRp276,000.00\ttws soundpat\tUtilities',
+    '04/01/2025\tRp1,000,000.00\tmeja kursi lampu\tUtilities',
+    '04/01/2025\tRp40,000.00\tbrasso, paku\tUtilities',
+    '04/01/2025\tRp40,000.00\tchitato + susu \tFood and Drinks',
+    '04/01/2025\tRp7,000.00\tnaskun\tFood and Drinks',
+    '04/01/2025\tRp7,000.00\tnaskun\tFood and Drinks',
+    '11/01/2025\tRp10,000.00\tbubur\tFood and Drinks',
+    '11/01/2025\tRp24,500.00\t   \tFood and Drinks',
+    '14/01/2025\tRp20,000.00\t      \tFood and Drinks',
+    '16/01/2025\tRp12,000.00\tbubur sapi\tFood and Drinks',
+    '17/01/2025\tRp7,000.00\tnaskun\tFood and Drinks',
+    '17/01/2025\tRp17,000.00\tsate padang\tFood and Drinks',
+    '21/01/2025\tRp7,000.00\tnaskun\tFood and Drinks',
+    '22/01/2025\tRp7,000.00\tnaskun\tFood and Drinks',
+    '22/01/2025\tRp77,289.00\tTOEFL \tOther',
+    '25/01/2025\tRp39,000.00\t    \tFood and Drinks',
+    '26/01/2025\tRp10,000.00\t5 chitatos\tFood and Drinks',
+    '28/01/2025\tRp6,000.00\t4 chitatos\tFood and Drinks',
+    '28/01/2025\tRp12,000.00\tayam datul\tFood and Drinks',
+    '28/01/2025\tRp12,000.00\t2 sambal geprek  \tFood and Drinks',
+    '02/02/2025\tRp7,500.00\tbiaya admin\tBank Admin',
+    '02/02/2025\tRp11,000.00\tayam datul\tFood and Drinks',
+    '02/02/2025\tRp6,000.00\tsambal geprek  \tFood and Drinks',
+    '02/02/2025\tRp595,600.00\tHardisk External 1TB WD ELEMENTS HDD External 500GB Portable USB\tUtilities',
+    '02/02/2025\tRp75,000.00\tusb\tUtilities',
+    '04/02/2025\tRp10,000.00\tsnacks\tFood and Drinks',
+    '08/02/2025\tRp15,000.00\tsnacks\tFood and Drinks',
+    '10/02/2025\tRp10,000.00\tsnacks\tFood and Drinks',
+    '11/02/2025\tRp10,000.00\tsnacks\tFood and Drinks',
+    '12/02/2025\tRp10,000.00\tsnacks\tFood and Drinks',
+    '12/02/2025\tRp19,000.00\tmixue\tFood and Drinks',
+    '12/02/2025\tRp11,000.00\tnikita ayam\tFood and Drinks',
+    '13/02/2025\tRp17,000.00\tnikita ayam\tFood and Drinks',
+    '15/02/2025\tRp7,000.00\tsnacks\tFood and Drinks',
+    '15/02/2025\tRp35,000.00\tearphone\tFood and Drinks',
+    '18/02/2025\tRp17,000.00\tnikita ayam\tFood and Drinks',
+    '20/02/2025\tRp17,000.00\tnikita ayam\tFood and Drinks',
+    '22/02/2025\tRp17,000.00\tnikita ayam\tFood and Drinks',
+    '22/02/2025\tRp7,200.00\tspaghetti\tFood and Drinks',
+    '22/02/2025\tRp292,700.00\tLogitech keyboard  \tUtilities',
+    '13/03/2025\tRp17,000.00\tnikita chicken\tFood and Drinks',
+    '14/03/2025\tRp17,000.00\tnikita chicken\tFood and Drinks',
+    '23/03/2025\tRp40,000.00\tbarber + shave\tPersonal',
+    '01/01/2025\tRp5,200,000.00\tgaji\tPaycheck',
+    '01/02/2025\tRp5,200,000.00\tgaji\tPaycheck',
+    '01/03/2025\tRp5,200,000.00\tgaji\tPaycheck',
+    '01/03/2025\tRp1,000,000.00\tAlbert\'s freelance\tPaycheck',
+  ]) {
+    final parts = line.split('\t');
+    final date = DateFormat('dd/MM/yyyy').parse(parts[0]);
+    final amount =
+        double.parse(parts[1].replaceAll(RegExp(r'[^\d.]'), '')) * -1;
+    final description = parts[2];
+    final category = parts[3];
+
+    final categoryId = (db.transactionCategories.select()
+      ..where((c) => c.name.equals(category)));
+
+    await db.transactions.insertOne(
+      TransactionsCompanion.insert(
+        date: date,
+        amount: amount,
+        description: description,
+        categoryId: (await categoryId.get()).firstOrNull!.id,
+      ),
+    );
+  }
 }
 
-class PersonalBudgetApp extends StatelessWidget {
+// UI
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await writeDummyData();
+
+  runApp(
+    ProviderScope(child: SpendoApp()),
+  );
+}
+
+class SpendoApp extends StatelessWidget {
+  const SpendoApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Personal Budgeting Tool',
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: ExpenseDashboard(),
+      title: 'Spendo',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: HomeScreen(),
     );
   }
 }
 
-class ExpenseDashboard extends StatefulWidget {
-  @override
-  _ExpenseDashboardState createState() => _ExpenseDashboardState();
-}
-
-class _ExpenseDashboardState extends State<ExpenseDashboard> {
-  List<Expense> _expenses = [];
-  double get totalSpending =>
-      _expenses.fold(0, (sum, item) => sum + item.amount);
-
-  void _addExpense(String title, double amount, DateTime date) {
-    final newExpense = Expense(
-      id: Uuid().v4(),
-      title: title,
-      amount: amount,
-      date: date,
-    );
-    setState(() => _expenses.add(newExpense));
-  }
-
-  void _openAddExpenseModal() {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => AddExpenseForm(onAdd: _addExpense),
-    );
-  }
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Personal Budget Tracker'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: _openAddExpenseModal,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Card(
-            margin: EdgeInsets.all(10),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total Spending:', style: TextStyle(fontSize: 18)),
-                  Text(' \$${totalSpending.toStringAsFixed(2)}',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal)),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _expenses.length,
-              itemBuilder: (ctx, idx) => ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.teal,
-                  child: Text(_expenses[idx].amount.toStringAsFixed(0)),
-                ),
-                title: Text(_expenses[idx].title),
-                subtitle: Text(
-                    '${_expenses[idx].date.toLocal().toString().split(" ")[0]}'),
-              ),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
-        onPressed: _openAddExpenseModal,
-      ),
-    );
-  }
-}
-
-class AddExpenseForm extends StatefulWidget {
-  final Function(String, double, DateTime) onAdd;
-  AddExpenseForm({required this.onAdd});
-
-  @override
-  _AddExpenseFormState createState() => _AddExpenseFormState();
-}
-
-class _AddExpenseFormState extends State<AddExpenseForm> {
-  final _titleController = TextEditingController();
-  final _amountController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
-
-  void _submitData() {
-    final enteredTitle = _titleController.text;
-    final enteredAmount = double.tryParse(_amountController.text) ?? 0;
-    if (enteredTitle.isEmpty || enteredAmount <= 0) return;
-    widget.onAdd(enteredTitle, enteredAmount, _selectedDate);
-    Navigator.of(context).pop();
-  }
-
-  void _pickDate() async {
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (pickedDate != null) {
-      setState(() => _selectedDate = pickedDate);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 5,
-      child: Padding(
-        padding: EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Spendo'),
+        ),
+        body: TabBarView(
           children: [
-            TextField(
-              decoration: InputDecoration(labelText: 'Title'),
-              controller: _titleController,
+            SummaryScreen(),
+            TransactionsScreen(),
+          ],
+        ),
+        bottomNavigationBar: TabBar(
+          tabs: [
+            Tab(
+              icon: Icon(Icons.pie_chart),
+              text: 'Summary',
             ),
-            TextField(
-              decoration: InputDecoration(labelText: 'Amount'),
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-            ),
-            SizedBox(height: 10),
-            Row(
-              children: [
-                Text('Date: ${_selectedDate.toLocal().toString().split(" ")[0]}'),
-                TextButton(
-                  onPressed: _pickDate,
-                  child: Text('Pick Date'),
-                ),
-              ],
-            ),
-            ElevatedButton(
-              onPressed: _submitData,
-              child: Text('Add Expense'),
+            Tab(
+              icon: Icon(Icons.list),
+              text: 'Transactions',
             ),
           ],
         ),
@@ -174,16 +188,116 @@ class _AddExpenseFormState extends State<AddExpenseForm> {
   }
 }
 
-class Expense {
-  final String id;
-  final String title;
-  final double amount;
-  final DateTime date;
+class SummaryScreen extends ConsumerWidget {
+  const SummaryScreen({super.key});
 
-  Expense({
-    required this.id,
-    required this.title,
-    required this.amount,
-    required this.date,
-  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(databaseProvider);
+    return FutureBuilder<List<TransactionCategory>>(
+      future: db.select(db.transactionCategories).get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+        final categories = snapshot.data!;
+        final incomeCategories = categories.where((c) => c.isIncome).toList();
+        final expenseCategories = categories.where((c) => !c.isIncome).toList();
+        return DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              TabBar(
+                tabs: [
+                  Tab(text: 'Expenses'),
+                  Tab(text: 'Income'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    ListView(
+                      children: expenseCategories
+                          .map((c) => ListTile(
+                                title: Text(c.name),
+                              ))
+                          .toList(),
+                    ),
+                    ListView(
+                      children: incomeCategories
+                          .map((c) => ListTile(
+                                title: Text(c.name),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class TransactionsScreen extends ConsumerWidget {
+  const TransactionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Transactions'),
+          bottom: TabBar(
+            tabs: [
+              Tab(text: 'Expenses'),
+              Tab(text: 'Income'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _buildTransactionList(context, ref, false),
+            _buildTransactionList(context, ref, true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionList(
+      BuildContext context, WidgetRef ref, bool isIncome) {
+    final db = ref.watch(databaseProvider);
+    final query = db.select(db.transactions).join([
+      innerJoin(db.transactionCategories,
+          db.transactions.categoryId.equalsExp(db.transactionCategories.id))
+    ])
+      ..where(db.transactionCategories.isIncome.equals(isIncome));
+    return FutureBuilder<List<TypedResult>>(
+      future: query.get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+        final transactions = snapshot.data!;
+        return ListView(
+          children: transactions
+              .map((t) => ListTile(
+                    title: Text(t.readTable(db.transactions).description),
+                    subtitle: Text(t.readTable(db.transactionCategories).name),
+                    trailing: Text(
+                        'Rp${t.readTable(db.transactions).amount.toString()}'),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
 }
